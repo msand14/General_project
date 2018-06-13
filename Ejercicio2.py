@@ -39,18 +39,27 @@ def tweets2list():
 
 
 def feeling_of_tweet (lista_tweet, dic_feel):
-    lista_palabras=[]
+    word_felt = False
     for i,tweet in enumerate(lista_tweet):
-        print("TWEET :" ,i,"")
+        print("TWEET :" ,i,":",tweet,"")
         valor = 0
         for sentimiento in dic_feel:
             if sentimiento in tweet:
                 valor = valor + int(dic_feel[sentimiento])
         print(len(tweet.split()))
         lista_palabras =tweet.split()
-        for i in lista_palabras:
-            print(i,":",(valor/len(tweet.split())))
-        print(tweet)
+        for palabra in lista_palabras:
+            for sentimiento in dic_feel:
+                if  sentimiento in palabra:
+                    word_felt = True
+                    break
+                else:
+                    word_felt = False
+            if word_felt == False:
+                print(palabra,":",(valor/len(tweet.split())))
+            elif word_felt == True:
+                print(palabra,":","No se muestra, ya tiene su valor asociado")
+        print(" \n")
 
 
 def main():
