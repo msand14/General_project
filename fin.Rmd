@@ -22,11 +22,11 @@ library(MASS)
 ```
 
 
-## 1-.Carga los datos. Realiza una inspección por variables de la distribución de aprobación de crédito en función de cada atributo visualmente. Realiza las observaciones pertinentes. ¿ Qué variables son mejores para separar los datos?
+## 1-.Carga los datos. Realiza una inspeccion por variables de la distribucion de aprobacion de credito en funcion de cada atributo visualmente. Realiza las observaciones pertinentes. � Que variables son mejores para separar los datos?
 
 Cargamos datos. Como el dataset contiene caracteres '?', hay que sustituirlos por 'NA' para posteriormente, imputar los 'NA'
 ```{r}
-url <- "/home/mescalonilla/R projects/CASO_FINAL_crx.data"
+url <- "file:///D:/uSUARIOS/CASO_FINAL_crx.data"
 df <- read.csv(url, header = FALSE,na.strings = c("?"))
 
 #Realizamos un EDA
@@ -35,8 +35,11 @@ head(df)
 str(df)
 
 #Preparamos V16 con valores numéricos 
-df$V16<-as.numeric(dt$V16)-1
-
+df$V1<-as.numeric(df$V1)-1
+df$V9<-as.numeric(df$V9)-1
+df$V10<-as.numeric(df$V10)-1
+df$V12<-as.numeric(df$V12)-1
+df$V16<-as.numeric(df$V16)-1
 ```
  Histogramas de las variables numéricas
 
@@ -118,7 +121,7 @@ f<-ggplot(df,aes(V16,V15))
 f+geom_boxplot()
 ```
 
-Como podemos comprobar, hay bastantes variables contínuas que al ser representadas mediante boxplots, demuestran tener datos imprecisosque se encuentran muy lejanos a la mayoria de los datos de dicha variable.
+Como podemos comprobar, hay bastantes variables continuas que al ser representadas mediante boxplots, demuestran tener datos imprecisos que se encuentran muy lejanos a la mayoria de los datos de dicha variable.
 
 
 ```{r}
@@ -134,7 +137,7 @@ df$V15<- as.numeric(df$V15)
 Las mejores variables para separar los datos son V1, V9, V10, V12, V16
 
 
-2-.Prepara el dataset convenientemente e imputa los valores faltantes usando la librería missForest
+2-.Prepara el dataset convenientemente e imputa los valores faltantes usando la libreria missForest
 
 ```{r}
 #contamos el numero de  elementos vacios
@@ -151,15 +154,15 @@ attach(dataset.imp)
 
 #dataset.imp$V16 <- factor(dataset.imp$V16,labels = c("0","1"))
 ```
-#Matriz de correlación de las variables numericas. Como vemos, no hay mucha relación entre las variables. En todo caso, hay una relación directa entre V8-V11 y entre V8-V2
+#Matriz de correlacion de las variables numericas. Como vemos, no hay mucha relacion entre las variables. En todo caso, hay una relacion directa entre V8-V11 y entre V8-V2
 ```{r}
 numeric_data_imp <- as.data.frame(df[,c(2,3,8,11,14,15)])
 corrs <- rcorr(as.matrix(numeric_data_imp))
 corrs$r
 ```
 
-#Analizamos la independencia entre las variables categóricas y V16 mediante chi test.
-Rechazamos la hipótesis nula tanto en V1 como con V12, rechazando así la afirmación de que son independientes con V16, ya que su p valor es menor de 0.05.
+#Analizamos la independencia entre las variables categoricas y V16 mediante chi test.
+Rechazamos la hipotesis nula tanto en V1 como con V12, rechazando asi la afirmacion de que son independientes con V16, ya que su p valor es menor de 0.05.
 ```{r}
 tbl = table(dataset.imp$V1, dataset.imp$V16)
 chisq.test(tbl)
@@ -189,16 +192,23 @@ tbl = table(dataset.imp$V13, dataset.imp$V16)
 chisq.test(tbl)
 ```
 
-#Selección del mejor modelo en función de los atributos usando el criterio AIC, de forma que aumenten el número de variables progresivamente.
-
+#Seleccion del mejor modelo en funcion de los atributos usando el criterio AIC, de forma que aumenten el numero de variables progresivamente.
 ```{r}
-step <- stepAIC(lm(dataset.imp$V16~1,data=dataset.imp),scope = dataset.imp$V16~V1 + V2 + V3 + V4 + V5 + V6 + V7 + V8 + V9 + V10 + V11 + V12 + V13 + V14 + V15, direction="forward")
+full<-glm(V16~.,data=dataset.imp)
+summary(full)
 ```
+Hemos visto que tanto V9 como V10 V13p y V6x est�n fuertemente relacionadas con V16
 
 
-3-.Divide el dataset tomando las primeras 590 instancias como train y las últimas 100 como test.
 ```{r}
-dataset.imp$V16 <- as.numeric(dataset.imp$V16) -1
+step<-stepAIC(full,direction = "backward")
+```
+La mejor opcion es la de un AIC mayor, es decir el model con todas las variables exceptuando la V5. Se tienen AICs optimos con las variables fuertes vistas anteriormente pero finalmente, el modelo con todas las variables menos la V5 es el mejor. 
+
+
+
+##3-.Divide el dataset tomando las primeras 590 instancias como train y las ultimas 100 como test.
+```{r}
 dataset_train <- dataset.imp[1:590, 1:16]
 dataset_test <- dataset.imp[591:690, 1:16]
 x <- dataset.imp[,1:15]
@@ -257,7 +267,7 @@ y_pred <- as.numeric(predict.glmnet(rl.lasso$glmnet.fit, newx=x_test, s=rl.lasso
 confusionMatrix(as.factor(y_test), as.factor(y_pred), mode="everything")
 ```
 
-
+Definitivamente el modelo que mayor area engloba debajo de la curva es el model de Ridge. Sin embargo ambos tienen la misma Accuracy  y el modelo Lasso tiene mejor Sensibilidad.
 
 
 5-.Aporta los log odds de las variables predictoras sobre la variable objetivo.
@@ -270,7 +280,7 @@ dataset.imp$V12 <- factor(dataset.imp$V12,labels = c("0","1"))
 
 hist(dt$V16)
 
-mod <- glm(V16 ~ V1 + V2 + V3 + V4 + V5 + V6 + V7 + V8 + V9 + V10 + V11 + V12 + V13 + V14 + V15 , data=dt, family=binomial)
+mod <- full
 mod$coefficients
 ```
 -Vemos que el cambio en la Variable V9t aumentará las oportunidad de tener un crédito aprovado con gran diferencia.
@@ -289,18 +299,16 @@ options(scipen=999)
 coef(mod)
 exp(coef(mod))
 ```
-Se puede observar que 
+Se puede observar que el factor que m�s influye es la V9, que hace que la probabilidad de obtener un credito aprobado sea 1.78 veces la de una persona que no tiene V9. 
 
-
-
+Tener V13p provoca que obtener el aprobado sea 1.6 veces mas facil.
 
 
 
 6-.Si por cada verdadero positivo ganamos 100e y por cada falso positivo perdemos 20e. ¿ Qué rentabilidad aporta aplicar este modelo?
-```{r}
-FP<-20
-VP<-100
-Rentabilidad<-(VP/(VP))
-```
+Con Ridge: 86 VP y 0 FN
+Con Lasso: 85 VP y 1 FN
+
+El que mayor rentabilidad aporta seria Ridge, del 100% , 98%.
 
 
