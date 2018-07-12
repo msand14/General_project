@@ -1,0 +1,306 @@
+---
+title: "R Final Exercise"
+output: html_notebook
+---
+
+```{r}
+install.packages('ggplot2',dependecies=True)
+install.packages('missForest',dependecies=True)
+library(missForest)
+install.packages('e1071')
+install.packages('caret')
+install.packages('e1071')
+library(caret)
+library(ggplot2)
+library(lattice)
+library(e1071)   
+install.packages("glmnet", repos = "http://cran.us.r-project.org")
+library(glmnet)
+install.packages("Hmisc")
+library(Hmisc)
+library(MASS)
+```
+
+
+## 1-.Carga los datos. Realiza una inspección por variables de la distribución de aprobación de crédito en función de cada atributo visualmente. Realiza las observaciones pertinentes. ¿ Qué variables son mejores para separar los datos?
+
+Cargamos datos. Como el dataset contiene caracteres '?', hay que sustituirlos por 'NA' para posteriormente, imputar los 'NA'
+```{r}
+url <- "/home/mescalonilla/R projects/CASO_FINAL_crx.data"
+df <- read.csv(url, header = FALSE,na.strings = c("?"))
+
+#Realizamos un EDA
+dim(df)
+head(df)
+str(df)
+
+#Preparamos V16 con valores numéricos 
+df$V16<-as.numeric(dt$V16)-1
+
+```
+ Histogramas de las variables numéricas
+
+```{r}
+numeric_data <- as.data.frame(df[,c(2,3,8,11,14,15)])
+par(mfrow=c(2,3))
+for(i in 1:6) {
+     hist(numeric_data[,i], main=names(numeric_data)[i])
+}
+```
+ boxplots de cada variable respecto a la variable objetivo
+```{r}
+f<-ggplot(df,aes(V16,V1))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V4))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V5))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V6))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V7))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V9))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V10))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V12))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V13))
+f+geom_count()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V2))
+f+geom_boxplot()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V3))
+f+geom_boxplot()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V11))
+f+geom_boxplot()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V12))
+f+geom_boxplot()
+```
+
+```{r}
+f<-ggplot(df,aes(V16,V15))
+f+geom_boxplot()
+```
+
+Como podemos comprobar, hay bastantes variables contínuas que al ser representadas mediante boxplots, demuestran tener datos imprecisosque se encuentran muy lejanos a la mayoria de los datos de dicha variable.
+
+
+```{r}
+df$V11<- as.numeric(df$V11)
+df$V14<- as.numeric(df$V14)
+df$V15<- as.numeric(df$V15)
+
+```
+
+
+
+
+Las mejores variables para separar los datos son V1, V9, V10, V12, V16
+
+
+2-.Prepara el dataset convenientemente e imputa los valores faltantes usando la librería missForest
+
+```{r}
+#contamos el numero de  elementos vacios
+sapply(df,function(x) sum(is.na(x)))
+
+#Utilizamos missForest para imputar los valores faltantes y comprobamos finalmente si queda algun valor vacio
+dataset<-missForest(df,maxiter = 10,ntree = 300)
+dataset.imp<-dataset$ximp
+sapply(dataset.imp,function(x) sum(is.na(x)))
+
+str(dataset.imp)
+
+attach(dataset.imp)
+
+#dataset.imp$V16 <- factor(dataset.imp$V16,labels = c("0","1"))
+```
+#Matriz de correlación de las variables numericas. Como vemos, no hay mucha relación entre las variables. En todo caso, hay una relación directa entre V8-V11 y entre V8-V2
+```{r}
+numeric_data_imp <- as.data.frame(df[,c(2,3,8,11,14,15)])
+corrs <- rcorr(as.matrix(numeric_data_imp))
+corrs$r
+```
+
+#Analizamos la independencia entre las variables categóricas y V16 mediante chi test.
+Rechazamos la hipótesis nula tanto en V1 como con V12, rechazando así la afirmación de que son independientes con V16, ya que su p valor es menor de 0.05.
+```{r}
+tbl = table(dataset.imp$V1, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V4, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V5, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V6, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V7, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V9, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V10, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V12, dataset.imp$V16)
+chisq.test(tbl)
+
+tbl = table(dataset.imp$V13, dataset.imp$V16)
+chisq.test(tbl)
+```
+
+#Selección del mejor modelo en función de los atributos usando el criterio AIC, de forma que aumenten el número de variables progresivamente.
+
+```{r}
+step <- stepAIC(lm(dataset.imp$V16~1,data=dataset.imp),scope = dataset.imp$V16~V1 + V2 + V3 + V4 + V5 + V6 + V7 + V8 + V9 + V10 + V11 + V12 + V13 + V14 + V15, direction="forward")
+```
+
+
+3-.Divide el dataset tomando las primeras 590 instancias como train y las últimas 100 como test.
+```{r}
+dataset.imp$V16 <- as.numeric(dataset.imp$V16) -1
+dataset_train <- dataset.imp[1:590, 1:16]
+dataset_test <- dataset.imp[591:690, 1:16]
+x <- dataset.imp[,1:15]
+y <- dataset.imp$V16
+
+x_train<-x[1:590,]
+y_train<-y[1:590]
+x_test<-x[591:690,]
+y_test<-(y[591:690])
+
+X_train<-data.matrix(x_train)
+x_test<-data.matrix(x_test)
+
+```
+4-.Entrena un modelo de regresión logística con regularización Ridge y Lasso en train seleccionando el que mejor AUC tenga. Da las métricas en test.
+
+------------------------RIDGE--------------------------------
+```{r}
+##model.log<- glm(V16~., data=dataset_train, family=binomial)
+
+
+set.seed(999)
+rl.ridge <- cv.glmnet(X_train, y_train, family='binomial', alpha=0, parallel=TRUE, standardize=TRUE, type.measure='auc')
+```
+   Representación, lamda min y error, coeficientes
+```{r}
+plot(rl.ridge)
+rl.ridge$lamda.min
+max(rl.ridge$cvm)
+coef(rl.ridge, s=rl.ridge$lambda.min)
+```
+    Métricas
+```{r}
+require(methods)
+y_pred <- as.numeric(predict.glmnet(rl.ridge$glmnet.fit, newx=x_test, s=rl.ridge$lambda.min)>.5)
+
+confusionMatrix(as.factor(y_test), as.factor(y_pred), mode="everything")
+```
+
+------------------------LASO--------------------------------
+```{r}
+set.seed(999)
+rl.lasso <- cv.glmnet(X_train, y_train, family='binomial', alpha=1, parallel=TRUE, standardize=TRUE, type.measure='auc')
+```
+    Representación, lamda min y error, coeficientes
+```{r}
+plot(rl.lasso)
+rl.lasso$lamda.min
+max(rl.lasso$cvm)
+coef(rl.lasso, s=rl.lasso$lambda.min)
+```
+   Métricas
+```{r}
+require(methods)
+y_pred <- as.numeric(predict.glmnet(rl.lasso$glmnet.fit, newx=x_test, s=rl.lasso$lambda.min)>.5)
+confusionMatrix(as.factor(y_test), as.factor(y_pred), mode="everything")
+```
+
+
+
+
+5-.Aporta los log odds de las variables predictoras sobre la variable objetivo.
+```{r}
+dataset.imp$V16 <- factor(dataset.imp$V16,labels = c("0","1"))
+dataset.imp$V1 <- factor(dataset.imp$V1,labels = c("0","1"))
+dataset.imp$V9 <- factor(dataset.imp$V9,labels = c("0","1"))
+dataset.imp$V10 <- factor(dataset.imp$V10,labels = c("0","1"))
+dataset.imp$V12 <- factor(dataset.imp$V12,labels = c("0","1"))
+
+hist(dt$V16)
+
+mod <- glm(V16 ~ V1 + V2 + V3 + V4 + V5 + V6 + V7 + V8 + V9 + V10 + V11 + V12 + V13 + V14 + V15 , data=dt, family=binomial)
+mod$coefficients
+```
+-Vemos que el cambio en la Variable V9t aumentará las oportunidad de tener un crédito aprovado con gran diferencia.
+
+-La desviación nula  es considerablemente mayor que la Desviación de los residuos por lo que podemos comprobar que el modelo se comporta mucho mejor con variables predictores que solo con el intercept
+
+-Vemos ahora con Anova como son las desviaciones de las pariables predictoras. Se puede comprobar que a medida que vamos introduciendo variables en el modelo ( de arriba a abajo) la desviación se reduce y por lo tanto el model se comporta mejor.
+
+```{r}
+anova(mod,test="Chisq")
+```
+
+-Analizamos los log odds 
+```{r}
+options(scipen=999) 
+coef(mod)
+exp(coef(mod))
+```
+Se puede observar que 
+
+
+
+
+
+
+6-.Si por cada verdadero positivo ganamos 100e y por cada falso positivo perdemos 20e. ¿ Qué rentabilidad aporta aplicar este modelo?
+```{r}
+FP<-20
+VP<-100
+Rentabilidad<-(VP/(VP))
+```
+
+
